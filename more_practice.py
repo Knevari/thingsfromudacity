@@ -4,14 +4,6 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import argparse
 
-# Hough Line Detection Parameters
-rho = 2
-theta = np.pi / 180
-threshold = 15
-min_line_length = 20
-max_line_gap = 20
-
-
 def createVertices(img):
     ysize = img.shape[0]
     xsize = img.shape[1]
@@ -36,6 +28,12 @@ def getEdgesFromImage(img):
 
 
 def getLinesFromImage(img):
+    # Hough Line Detection Parameters
+    rho = 2
+    theta = np.pi / 180
+    threshold = 15
+    min_line_length = 20
+    max_line_gap = 20
     lines = cv2.HoughLinesP(img, rho, theta, threshold,
                             np.array([]), min_line_length, max_line_gap)
     return lines
