@@ -21,11 +21,11 @@ def divide_lines(lines, dimensions=np.array([[3, 3, 3]], dtype=np.uint8)):
     left_lines_len = []
     right_lines_len = []
 
-    left_avg_slope = 0
-    left_avg_intercept = 0
+    left_avg_slope = 1
+    left_avg_intercept = 1
 
-    right_avg_slope = 0
-    right_avg_intercept = 0
+    right_avg_slope = 1
+    right_avg_intercept = 1
 
     for line in lines:
         x1, y1, x2, y2 = line[0]
@@ -173,9 +173,13 @@ def process_image(image):
     blur = gaussian_blur(gray, 9)
     edges = cv2.Canny(blur, 50, 160)
     roi = get_roi(edges)
-    lines = hough_lines(roi, 2, np.pi / 180, 20, 30, 70)
-    output = cv2.addWeighted(image, .8, lines, .8, 0.)
-    return output
+    lines = hough_lines(roi, 3, np.pi / 180, 20, 30, 100)
+
+    # For parameter tuning purposes
+    color_edges = np.dstack((edges, edges, edges))
+    edges_output = cv2.addWeighted(color_edges, .8, lines, 1, 0)
+    image_output = cv2.addWeighted(image, .8, lines, 1, 0)
+    return edges_output, image_output
 
 
 def main():
@@ -201,10 +205,11 @@ def main():
         ret, frame = cap.read()
 
         if ret == True:
-            output = process_image(frame)
+            edges, output = process_image(frame)
             out.write(output)
 
             cv2.imshow("Original Frame", frame)
+            cv2.imshow("Edges Frame", edges)
             cv2.imshow("Modified Frame", output)
         else:
             cap.release()
