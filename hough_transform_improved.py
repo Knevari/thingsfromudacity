@@ -6,7 +6,7 @@ import matplotlib.image as mpimg
 ksize = 5
 
 # Read in and grayscale the image
-image = mpimg.imread('exit-ramp.jpg')
+image = mpimg.imread('images/exit-ramp.jpg')
 gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
 # Apply Gaussian Blur on the gray image and apply Canny

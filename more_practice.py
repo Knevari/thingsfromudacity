@@ -4,11 +4,12 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import argparse
 
+
 def createVertices(img):
     ysize = img.shape[0]
     xsize = img.shape[1]
     vertices = np.array(
-        [[(0, ysize), (450, 290), (490, 290), (xsize, ysize)]],
+        [[(0, ysize), (460, 305), (490, 305), (xsize, ysize)]],
         dtype=np.int32
     )
     return vertices
@@ -16,7 +17,7 @@ def createVertices(img):
 
 def getEdgesFromImage(img):
     blurred_gray_image = cv2.GaussianBlur(img, (5, 5), 0)
-    edges = cv2.Canny(blurred_gray_image, 50, 150)
+    edges = cv2.Canny(blurred_gray_image, 60, 190)
 
     mask = np.zeros_like(edges)
     vertices = createVertices(edges)
@@ -55,7 +56,7 @@ def main():
 
     for line in lines:
         for x1, y1, x2, y2 in line:
-            cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 4)
+            cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 10)
 
     color_edges = np.dstack((edges, edges, edges))
     combo = cv2.addWeighted(color_edges, 0.8, line_image, 1, 0)
