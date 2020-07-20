@@ -45,7 +45,7 @@ def divide_lines(lines, dimensions=np.array([[3, 3, 3]], dtype=np.uint8)):
         b = y1 - m * x1
 
         # Euclidean Distance
-        d = np.sqrt(np.power(Δx, 2) + np.power(Δy, 2))
+        d = np.sqrt(Δx ** 2 + Δy ** 2)
 
         if m < 0:
             left_lines_len.append(d)
@@ -73,8 +73,45 @@ def divide_lines(lines, dimensions=np.array([[3, 3, 3]], dtype=np.uint8)):
     right_x1 = int((y_starting_point - right_avg_intercept) / right_avg_slope)
     right_x2 = int((y_ending_point - right_avg_intercept) / right_avg_slope)
 
-    left_lane = (left_x1, y_starting_point, left_x2, y_ending_point)
-    right_lane = (right_x1, y_starting_point, right_x2, y_ending_point)
+    left_lane = [left_x1, y_starting_point, left_x2, y_ending_point]
+    right_lane = [right_x1, y_starting_point, right_x2, y_ending_point]
+
+    return update_coordinates_between_points(left_lane, right_lane)
+
+
+prev_left_lane = np.array([0, 0, 0, 0])
+prev_right_lane = np.array([0, 0, 0, 0])
+
+
+def update_coordinates_between_points(left_lane, right_lane):
+    global prev_left_lane, prev_right_lane
+
+    if (prev_left_lane == np.zeros(4)).all():
+        prev_left_lane = left_lane
+
+    if (prev_right_lane == np.zeros(4)).all():
+        prev_right_lane = right_lane
+
+    prev_left_x1, _, prev_left_x2, _ = prev_left_lane
+    prev_right_x1, _, prev_right_x2, _ = prev_right_lane
+
+    left_x1, _, left_x2, _ = left_lane
+    right_x1, _, right_x2, _ = right_lane
+
+    middle_left_x1 = (prev_left_x1 + left_x1) * 0.5
+    middle_left_x2 = (prev_left_x2 + left_x2) * 0.5
+
+    middle_right_x1 = (prev_right_x1 + right_x1) * 0.5
+    middle_right_x2 = (prev_right_x2 + right_x2) * 0.5
+
+    left_lane[0] = int(middle_left_x1)
+    left_lane[2] = int(middle_left_x2)
+
+    right_lane[0] = int(middle_right_x1)
+    right_lane[2] = int(middle_right_x2)
+
+    prev_left_lane = left_lane
+    prev_right_lane = right_lane
 
     return left_lane, right_lane
 
@@ -134,9 +171,9 @@ def get_roi(image):
 def process_image(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blur = gaussian_blur(gray, 9)
-    edges = cv2.Canny(blur, 50, 150)
+    edges = cv2.Canny(blur, 50, 160)
     roi = get_roi(edges)
-    lines = hough_lines(roi, 2, np.pi / 180, 15, 5, 20)
+    lines = hough_lines(roi, 2, np.pi / 180, 20, 30, 70)
     output = cv2.addWeighted(image, .8, lines, .8, 0.)
     return output
 
@@ -161,13 +198,16 @@ def main():
                           (frame_width, frame_height), True)
 
     while cap.isOpened():
-        _, frame = cap.read()
+        ret, frame = cap.read()
 
-        output = process_image(frame)
-        out.write(output)
+        if ret == True:
+            output = process_image(frame)
+            out.write(output)
 
-        cv2.imshow("Original Frame", frame)
-        cv2.imshow("Modified Frame", output)
+            cv2.imshow("Original Frame", frame)
+            cv2.imshow("Modified Frame", output)
+        else:
+            cap.release()
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
