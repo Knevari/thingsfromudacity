@@ -14,6 +14,12 @@ def draw_line(image, line, color=[255, 0, 0], thickness=10):
     cv2.line(image, (x1, y1), (x2, y2), color, thickness)
 
 
+def get_lane(m, b, y1, y2):
+    x1 = int((y1 - b) / m)
+    x2 = int((y2 - b) / m)
+    return [x1, y1, x2, y2]
+
+
 def divide_lines(lines, dimensions=np.array([[3, 3, 3]], dtype=np.uint8)):
     left_lines = []
     right_lines = []
@@ -65,16 +71,12 @@ def divide_lines(lines, dimensions=np.array([[3, 3, 3]], dtype=np.uint8)):
         right_avg_slope, right_avg_intercept = right_lines_dot / right_lines_len_sum
 
     y_starting_point = int(dimensions[0])
-    y_ending_point = int(dimensions[0] * 0.6)
+    y_ending_point = int(dimensions[0] * 0.64)
 
-    left_x1 = int((y_starting_point - left_avg_intercept) / left_avg_slope)
-    left_x2 = int((y_ending_point - left_avg_intercept) / left_avg_slope)
-
-    right_x1 = int((y_starting_point - right_avg_intercept) / right_avg_slope)
-    right_x2 = int((y_ending_point - right_avg_intercept) / right_avg_slope)
-
-    left_lane = [left_x1, y_starting_point, left_x2, y_ending_point]
-    right_lane = [right_x1, y_starting_point, right_x2, y_ending_point]
+    left_lane = get_lane(left_avg_slope, left_avg_intercept,
+                         y_starting_point, y_ending_point)
+    right_lane = get_lane(right_avg_slope, right_avg_intercept,
+                          y_starting_point, y_ending_point)
 
     return update_coordinates_between_points(left_lane, right_lane)
 
@@ -145,11 +147,11 @@ def get_roi(image):
     ysize = image.shape[0]
     xsize = image.shape[1]
 
-    left_bottom = (0, ysize)
-    left_top = (xsize / 2 - 60, ysize / 2 + 60)
+    left_bottom = (130, ysize)
+    left_top = (xsize / 2 - 60, ysize / 2 + 50)
 
-    right_bottom = (xsize, ysize)
-    right_top = (xsize / 2 + 60, ysize / 2 + 60)
+    right_bottom = (xsize-130, ysize)
+    right_top = (xsize / 2 + 60, ysize / 2 + 50)
 
     vertices = np.array(
         [[left_bottom, left_top, right_top, right_bottom]],
@@ -163,22 +165,47 @@ def get_roi(image):
         ignore_mask_color = 255
 
     cv2.fillPoly(mask, vertices, ignore_mask_color)
-
     masked_image = cv2.bitwise_and(mask, image)
+
     return masked_image
+
+
+def adjust_gamma(image, gamma):
+    table = np.array([((i / 255.0) ** (1.0 / 0.4)) * 255
+                      for i in np.arange(0, 256)]).astype("uint8")
+
+    return cv2.LUT(image, table)
 
 
 def process_image(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blur = gaussian_blur(gray, 9)
-    edges = cv2.Canny(blur, 50, 160)
+    gray = adjust_gamma(gray, 0.4)
+
+    hls = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
+
+    lower_white = np.array([0, 200, 0], dtype=np.uint8)
+    upper_white = np.array([200, 255, 255], dtype=np.uint8)
+
+    lower_yellow = np.array([10, 0, 100], dtype=np.uint8)
+    upper_yellow = np.array([40, 255, 255], dtype=np.uint8)
+
+    white_mask = cv2.inRange(hls, lower_white, upper_white)
+    yellow_mask = cv2.inRange(hls, lower_yellow, upper_yellow)
+
+    mask = cv2.bitwise_or(white_mask, yellow_mask)
+    masked_image = cv2.bitwise_and(gray, mask)
+
+    blur = gaussian_blur(masked_image, 9)
+    edges = cv2.Canny(blur, 50, 150)
     roi = get_roi(edges)
-    lines = hough_lines(roi, 3, np.pi / 180, 20, 30, 100)
+    lines = hough_lines(roi, 2, np.pi / 180, 20, 30, 130)
 
     # For parameter tuning purposes
     color_edges = np.dstack((edges, edges, edges))
     edges_output = cv2.addWeighted(color_edges, .8, lines, 1, 0)
+
     image_output = cv2.addWeighted(image, .8, lines, 1, 0)
+
     return edges_output, image_output
 
 
@@ -206,11 +233,12 @@ def main():
 
         if ret == True:
             edges, output = process_image(frame)
+
             out.write(output)
 
-            cv2.imshow("Original Frame", frame)
             cv2.imshow("Edges Frame", edges)
             cv2.imshow("Modified Frame", output)
+
         else:
             cap.release()
 
