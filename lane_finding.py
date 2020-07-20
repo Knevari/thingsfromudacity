@@ -9,7 +9,7 @@ def gaussian_blur(image, ksize=3, σ=0):
     return cv2.GaussianBlur(image, (ksize, ksize), σ)
 
 
-def draw_line(image, line, color=[255, 0, 0], thickness=8):
+def draw_line(image, line, color=[255, 0, 0], thickness=10):
     x1, y1, x2, y2 = line
     cv2.line(image, (x1, y1), (x2, y2), color, thickness)
 
@@ -93,8 +93,9 @@ def hough_lines(image, ρ, ϴ, threshold, min_line_len, max_line_gap):
 
     left_lane, right_lane = divide_lines(lines, image.shape)
 
-    draw_line(line_img, left_lane, [77, 23, 120])
-    draw_line(line_img, right_lane, [45, 65, 255])
+    # BGR
+    draw_line(line_img, left_lane, [0, 0, 255])
+    draw_line(line_img, right_lane, [255, 0, 0])
     # draw_lines(line_img, left_lines, [0, 255, 0])
     # draw_lines(line_img, right_lines, [0, 0, 255])
 
@@ -119,7 +120,7 @@ def get_roi(image):
     )
 
     if len(image.shape) > 2:
-        channel_count = image.shape[2]  # i.e. 3 or 4 depending on your image
+        channel_count = image.shape[2]
         ignore_mask_color = (255,) * channel_count
     else:
         ignore_mask_color = 255
@@ -136,7 +137,7 @@ def process_image(image):
     edges = cv2.Canny(blur, 50, 150)
     roi = get_roi(edges)
     lines = hough_lines(roi, 2, np.pi / 180, 15, 5, 20)
-    output = cv2.addWeighted(image, .8, lines, 1., 0.)
+    output = cv2.addWeighted(image, .8, lines, .8, 0.)
     return output
 
 
@@ -146,12 +147,24 @@ def main():
 
     args = parser.parse_args()
 
-    cap = cv2.VideoCapture(args.filename)
+    filename, extension = args.filename.split('.')
+
+    cap = cv2.VideoCapture(filename + '.' + extension)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+
+    frame_width = int(cap.get(3))
+    frame_height = int(cap.get(4))
+
+    out = cv2.VideoWriter('output/' + filename + '.mp4', fourcc, fps,
+                          (frame_width, frame_height), True)
 
     while cap.isOpened():
-        ret, frame = cap.read()
+        _, frame = cap.read()
 
         output = process_image(frame)
+        out.write(output)
 
         cv2.imshow("Original Frame", frame)
         cv2.imshow("Modified Frame", output)
@@ -159,6 +172,7 @@ def main():
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+    out.release()
     cap.release()
     cv2.destroyAllWindows()
 
