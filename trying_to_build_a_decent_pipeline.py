@@ -47,6 +47,43 @@ def getDirectionBinary(sobely, sobelx, dir_thresh=(np.pi/6, np.pi/2)):
     return dir_binary
 
 
+def warpImage(img):
+    y = img.shape[0]
+    x = img.shape[1]
+    offset = 40
+
+    src = np.float32([
+        [160,  720],
+        [570,  460],
+        [690,  460],
+        [1090, 720]
+    ])
+
+    dst = np.float32([
+        [offset, y-offset],
+        [offset, offset],
+        [x-offset, offset],
+        [x-offset, y-offset]
+    ])
+
+    M = cv2.getPerspectiveTransform(src, dst)
+    # Minv = cv2.getPerspectiveTransform(dst, src)
+
+    img = debugPolylines(img, src, dst)
+
+    warped = cv2.warpPerspective(
+        combined, M, combined.shape[1::-1], flags=cv2.INTER_LINEAR)
+
+    return warped
+
+
+def divideHistogram(hist):
+    midpoint = np.int(hist.shape[0]//2)
+    leftx_base = np.argmax(hist[:midpoint])
+    rightx_base = np.argmax(hist[midpoint:]) + midpoint
+    return leftx_base, rightx_base
+
+
 images = [
     "images/signs_vehicles_xygrad.png",
     "images/test.jpg",
@@ -69,37 +106,67 @@ grad_binary[(sx_binary == 1) & (dir_binary == 1)] = 1
 
 # combined = np.dstack(
 #     (np.zeros_like(H), light_binary, grad_binary)) * 255
+
+# Combine multiple thresholds to a single output
 combined = np.zeros_like(grad_binary)
 combined[(grad_binary == 1) & (light_binary == 1)] = 1
 
-y = image.shape[0]
-x = image.shape[1]
-offset = 100
+warped = warpImage(combined)
 
-src = np.float32([
-    [160,  720],
-    [570,  460],
-    [690,  460],
-    [1090, 720]
-])
-
-dst = np.float32([
-    [offset, y-offset],
-    [offset, offset],
-    [x-offset, offset],
-    [x-offset, y-offset]
-])
-
-M = cv2.getPerspectiveTransform(src, dst)
-Minv = cv2.getPerspectiveTransform(dst, src)
-
-image = debugPolylines(image, src, dst)
-
-warped = cv2.warpPerspective(
-    combined, M, combined.shape[1::-1], flags=cv2.INTER_LINEAR)
-
+# Create a histogram to identify where the lane lines possibly are
 histogram = np.sum(warped[warped.shape[0]//2:, :], axis=0)
 
-plt.imshow(warped, cmap="gray")
-plt.plot(histogram)
+# Apply sliding windows technique to find lanes
+leftx_base, rightx_base = divideHistogram(histogram)
+
+nonzero = warped.nonzero()
+nonzeroy = nonzero[0]
+nonzerox = nonzero[1]
+
+# Number of sliding windows
+nwindows = 9
+margin = 100
+minpix = 50
+
+window_height = np.int(warped.shape[0]//nwindows)
+
+leftx_current = leftx_base
+rightx_current = rightx_base
+
+out_image = np.dstack((warped, warped, warped)) * 255
+
+left_lane_idxs = []
+right_lane_idxs = []
+
+for w in range(nwindows):
+    y_top = warped.shape[0] - (w * window_height)
+    y_bottom = warped.shape[0] - ((w + 1) * window_height)
+
+    left_window_leftx = leftx_current - margin
+    left_window_rightx = leftx_current + margin
+
+    right_window_leftx = rightx_current - margin
+    right_window_rightx = rightx_current + margin
+
+    cv2.rectangle(out_image, (left_window_leftx, y_top),
+                  (left_window_rightx, y_bottom), (0, 255, 0), 4)
+    cv2.rectangle(out_image, (right_window_leftx, y_top),
+                  (right_window_rightx, y_bottom), (0, 255, 0), 4)
+
+    left_idxs = ((nonzeroy >= y_bottom) & (nonzeroy < y_top) &
+                 (nonzerox >= left_window_leftx) & (nonzerox < left_window_rightx)).nonzero()[0]
+
+    right_idxs = ((nonzeroy >= y_bottom) & (nonzeroy < y_top) &
+                  (nonzerox >= right_window_leftx) & (nonzerox < right_window_rightx)).nonzero()[0]
+
+    left_lane_idxs.append(left_idxs)
+    right_lane_idxs.append(right_idxs)
+
+    if len(left_lane_idxs) > minpix:
+        leftx_current = np.int(np.mean(nonzerox[left_lane_idxs]))
+
+    if len(right_lane_idxs) > minpix:
+        rightx_current = np.int(np.mean(nonzerox[right_lane_idxs]))
+
+plt.imshow(out_image)
 plt.show()
