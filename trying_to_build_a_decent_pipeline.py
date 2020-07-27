@@ -162,11 +162,11 @@ for w in range(nwindows):
     left_lane_idxs.append(left_idxs)
     right_lane_idxs.append(right_idxs)
 
-    if len(left_lane_idxs) > minpix:
-        leftx_current = np.int(np.mean(nonzerox[left_lane_idxs]))
+    if len(left_idxs) > minpix:
+        leftx_current = np.int(np.mean(nonzerox[left_idxs]))
 
-    if len(right_lane_idxs) > minpix:
-        rightx_current = np.int(np.mean(nonzerox[right_lane_idxs]))
+    if len(right_idxs) > minpix:
+        rightx_current = np.int(np.mean(nonzerox[right_idxs]))
 
 plt.imshow(out_image)
 plt.show()
